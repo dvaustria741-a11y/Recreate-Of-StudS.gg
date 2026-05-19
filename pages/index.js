@@ -194,7 +194,7 @@ function PublishModal({ game, user, onClose }) {
           scripts: game.scripts,
           gameName: game.gameName,
           apiKey: apiKey.trim(),
-          // userId comes from the session on the server — never trust the client
+          userId: user.userId,
         }),
       })
       const data = await res.json()
@@ -266,16 +266,8 @@ function PublishModal({ game, user, onClose }) {
               <div style={{
                 background: '#1a0808', border: '1px solid #5c1a1a',
                 borderRadius: 8, padding: '10px 14px', color: '#f87171',
-                fontSize: 12, marginBottom: 12, lineHeight: 1.6,
-              }}>
-                <strong>Failed to publish</strong><br />{status}
-                {status.includes('Asset:Write') && (
-                  <div style={{ marginTop: 4, opacity: 0.8 }}>→ Edit your API key at create.roblox.com/credentials and enable Asset:Write</div>
-                )}
-                {status.includes('Invalid API key') && (
-                  <div style={{ marginTop: 4, opacity: 0.8 }}>→ Generate a new key at create.roblox.com/credentials</div>
-                )}
-              </div>
+                fontSize: 12, marginBottom: 12,
+              }}>{status}</div>
             )}
             <div style={{ display: 'flex', gap: 10 }}>
               <button onClick={onClose} style={{
@@ -313,12 +305,12 @@ function ResultScreen({ game, user, onReset }) {
     setTimeout(() => setCopied(null), 2000)
   }
 
-  const downloadRbxmx = () => {
-    const blob = new Blob([game.rbxmx], { type: 'application/xml' })
+  const downloadRbxl = () => {
+    const blob = new Blob([game.rbxl], { type: 'application/xml' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `${game.gameName || 'game'}.rbxmx`
+    a.download = `${game.gameName || 'game'}.rbxl`
     a.click()
     URL.revokeObjectURL(url)
   }
@@ -342,12 +334,12 @@ function ResultScreen({ game, user, onReset }) {
           ))}
         </div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          <button onClick={downloadRbxmx} style={{
+          <button onClick={downloadRbxl} style={{
             padding: '10px 20px', borderRadius: 8,
             background: '#1a1a1a', color: '#e8e8e8',
             border: `1px solid ${BORDER}`,
             fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit',
-          }}>⬇ Download .rbxmx</button>
+          }}>Download .rbxl</button>
           <button onClick={() => setShowPublish(true)} style={{
             padding: '10px 20px', borderRadius: 8,
             background: CYAN, color: '#000', border: 'none',
