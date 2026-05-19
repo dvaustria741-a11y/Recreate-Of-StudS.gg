@@ -89,22 +89,19 @@ function Nav({ user, onReset }) {
         STUD<span style={{ color: CYAN }}>S</span>
         <span style={{ color: '#333', fontWeight: 400, fontSize: 13 }}>.gg</span>
       </div>
-
       {user ? (
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <Avatar user={user} />
           <span style={{ fontSize: 13, color: '#888' }}>{user.username}</span>
           <a href="/api/auth/logout" style={{
             fontSize: 12, color: '#444', textDecoration: 'none',
-            padding: '5px 12px', border: `1px solid ${BORDER}`,
-            borderRadius: 6,
+            padding: '5px 12px', border: `1px solid ${BORDER}`, borderRadius: 6,
           }}>Log out</a>
         </div>
       ) : (
         <span style={{
           fontSize: 11, padding: '3px 10px', borderRadius: 20,
-          background: '#001a2e', color: CYAN,
-          border: `1px solid #0077aa`,
+          background: '#001a2e', color: CYAN, border: `1px solid #0077aa`,
           letterSpacing: '0.06em', textTransform: 'uppercase', fontWeight: 700,
         }}>AI-Powered</span>
       )}
@@ -125,7 +122,6 @@ function LoginScreen({ error }) {
       <p style={{ fontSize: 15, color: '#555', marginBottom: 36, lineHeight: 1.7 }}>
         Describe your Roblox game.<br />AI builds the Luau scripts. In seconds.
       </p>
-
       {error && (
         <div style={{
           background: '#1a0808', border: '1px solid #5c1a1a',
@@ -137,13 +133,11 @@ function LoginScreen({ error }) {
            'Something went wrong. Please try again.'}
         </div>
       )}
-
       <a href="/api/auth/login" style={{
         display: 'inline-flex', alignItems: 'center', gap: 12,
         padding: '14px 32px', borderRadius: 12,
         background: CYAN, color: '#000',
         fontWeight: 800, fontSize: 16, textDecoration: 'none',
-        letterSpacing: '0.01em',
       }}>
         <svg width="22" height="22" viewBox="0 0 40 40" fill="none">
           <rect width="40" height="40" rx="8" fill="#000" />
@@ -153,7 +147,6 @@ function LoginScreen({ error }) {
         </svg>
         Sign in with Roblox
       </a>
-
       <p style={{ fontSize: 12, color: '#333', marginTop: 20 }}>
         We only read your username and avatar. We never post on your behalf.
       </p>
@@ -183,10 +176,127 @@ function BuildingScreen({ prompt, dots }) {
   )
 }
 
-function ResultScreen({ game, onReset }) {
+function PublishModal({ game, user, onClose }) {
+  const [apiKey, setApiKey] = useState('')
+  const [status, setStatus] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [assetId, setAssetId] = useState(null)
+
+  const publish = async () => {
+    if (!apiKey.trim()) return
+    setLoading(true)
+    setStatus('')
+    try {
+      const res = await fetch('/api/publish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          rbxmx: game.rbxmx,
+          gameName: game.gameName,
+          apiKey: apiKey.trim(),
+          userId: user.userId,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Publish failed')
+      setAssetId(data.assetId)
+      setStatus('success')
+    } catch (e) {
+      setStatus(e.message || 'Publish failed')
+    }
+    setLoading(false)
+  }
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      zIndex: 100, padding: 24,
+    }}>
+      <div style={{
+        background: '#111', border: `1px solid ${BORDER}`,
+        borderRadius: 16, padding: 28, width: '100%', maxWidth: 460,
+      }}>
+        <div style={{ fontSize: 18, fontWeight: 800, color: '#fff', marginBottom: 6 }}>
+          Publish to Roblox
+        </div>
+        <div style={{ fontSize: 13, color: '#555', marginBottom: 20 }}>
+          Your scripts will be uploaded as a Model asset to your Roblox account.
+        </div>
+
+        {status === 'success' ? (
+          <div>
+            <div style={{
+              background: '#0d2a1a', border: '1px solid #16532e',
+              borderRadius: 8, padding: '14px 18px', color: '#22c55e',
+              fontSize: 14, marginBottom: 16, textAlign: 'center',
+            }}>
+              ✓ Published! Asset ID: <strong>{assetId}</strong>
+            </div>
+            <div style={{ fontSize: 12, color: '#555', marginBottom: 20 }}>
+              Find it in Roblox Studio → Toolbox → My Models
+            </div>
+            <button onClick={onClose} style={{
+              width: '100%', padding: '11px', borderRadius: 8,
+              background: CYAN, color: '#000', border: 'none',
+              fontWeight: 800, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit',
+            }}>Done</button>
+          </div>
+        ) : (
+          <div>
+            <div style={{ fontSize: 12, color: '#555', marginBottom: 6 }}>
+              Open Cloud API Key
+            </div>
+            <div style={{ fontSize: 11, color: '#2a5a6a', marginBottom: 10 }}>
+              Get it from create.roblox.com/credentials → API Keys → Create → enable Asset:Write
+            </div>
+            <input
+              type="password"
+              placeholder="Paste your Open Cloud API key..."
+              value={apiKey}
+              onChange={e => setApiKey(e.target.value)}
+              style={{
+                width: '100%', padding: '11px 14px', borderRadius: 8,
+                background: '#0a0a0a', border: `1px solid ${BORDER}`,
+                color: '#e8e8e8', fontSize: 13, fontFamily: 'inherit',
+                outline: 'none', marginBottom: 12, boxSizing: 'border-box',
+              }}
+            />
+            {status && status !== 'success' && (
+              <div style={{
+                background: '#1a0808', border: '1px solid #5c1a1a',
+                borderRadius: 8, padding: '10px 14px', color: '#f87171',
+                fontSize: 12, marginBottom: 12,
+              }}>{status}</div>
+            )}
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={onClose} style={{
+                flex: 1, padding: '11px', borderRadius: 8,
+                background: 'transparent', border: `1px solid ${BORDER}`,
+                color: '#555', cursor: 'pointer', fontSize: 13, fontFamily: 'inherit',
+              }}>Cancel</button>
+              <button onClick={publish} disabled={!apiKey.trim() || loading} style={{
+                flex: 2, padding: '11px', borderRadius: 8,
+                background: CYAN, color: '#000', border: 'none',
+                fontWeight: 800, fontSize: 13, cursor: !apiKey.trim() || loading ? 'not-allowed' : 'pointer',
+                fontFamily: 'inherit', opacity: !apiKey.trim() || loading ? 0.5 : 1,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              }}>
+                {loading ? <><Spinner />Publishing…</> : '🚀 Publish'}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function ResultScreen({ game, user, onReset }) {
   const [activeScript, setActiveScript] = useState(0)
   const [tab, setTab] = useState('scripts')
   const [copied, setCopied] = useState(null)
+  const [showPublish, setShowPublish] = useState(false)
 
   const copy = async (text, id) => {
     try { await navigator.clipboard.writeText(text) } catch {}
@@ -208,6 +318,8 @@ function ResultScreen({ game, onReset }) {
 
   return (
     <div style={{ maxWidth: 780, margin: '0 auto', padding: '32px 20px 60px' }}>
+      {showPublish && <PublishModal game={game} user={user} onClose={() => setShowPublish(false)} />}
+
       <div style={{ marginBottom: 24 }}>
         <div style={{ fontSize: 11, color: '#2a6a8a', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 6 }}>Generated Game</div>
         <h2 style={{ fontSize: 28, fontWeight: 900, color: '#fff', marginBottom: 8 }}>{game.gameName}</h2>
@@ -220,11 +332,19 @@ function ResultScreen({ game, onReset }) {
             }}>{f}</span>
           ))}
         </div>
-        <button onClick={downloadRbxmx} style={{
-          padding: '10px 20px', borderRadius: 8,
-          background: CYAN, color: '#000', border: 'none',
-          fontWeight: 800, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit',
-        }}>⬇ Download .rbxmx</button>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <button onClick={downloadRbxmx} style={{
+            padding: '10px 20px', borderRadius: 8,
+            background: '#1a1a1a', color: '#e8e8e8',
+            border: `1px solid ${BORDER}`,
+            fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit',
+          }}>⬇ Download .rbxmx</button>
+          <button onClick={() => setShowPublish(true)} style={{
+            padding: '10px 20px', borderRadius: 8,
+            background: CYAN, color: '#000', border: 'none',
+            fontWeight: 800, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit',
+          }}>🚀 Publish to Roblox</button>
+        </div>
       </div>
 
       <div style={{ display: 'flex', gap: 0, borderBottom: `1px solid ${BORDER}`, marginBottom: 20 }}>
@@ -243,14 +363,14 @@ function ResultScreen({ game, onReset }) {
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {(game.scripts || []).map((sc, i) => (
               <button key={i} onClick={() => setActiveScript(i)} style={{
-                padding: '6px 14px', borderRadius: 7, border: `1px solid ${i === activeScript ? CYAN : BORDER}`,
+                padding: '6px 14px', borderRadius: 7,
+                border: `1px solid ${i === activeScript ? CYAN : BORDER}`,
                 background: i === activeScript ? '#001a2e' : 'transparent',
                 color: i === activeScript ? CYAN : '#555',
                 fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'monospace',
               }}>{sc.name}</button>
             ))}
           </div>
-
           {s.name && (
             <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, overflow: 'hidden' }}>
               <div style={{
@@ -296,8 +416,7 @@ function ResultScreen({ game, onReset }) {
               </div>
             ))}
           </div>
-
-          <div style={{ marginTop: 20, padding: 16, background: '#0d0d0d', borderRadius: 8, border: `1px solid ${BORDER}` }}>
+          <div style={{ padding: 16, background: '#0d0d0d', borderRadius: 8, border: `1px solid ${BORDER}` }}>
             <div style={{ fontSize: 11, color: '#333', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 10, fontWeight: 700 }}>Script placement</div>
             {(game.scripts || []).map((s, i) => (
               <div key={i} style={{
@@ -350,7 +469,6 @@ function HomeScreen({ user }) {
     setError('')
     setGame(null)
     setScreen('building')
-
     try {
       const res = await fetch('/api/generate', {
         method: 'POST',
@@ -371,17 +489,14 @@ function HomeScreen({ user }) {
   const reset = () => { setScreen('home'); setGame(null); setPrompt(''); setError('') }
 
   if (screen === 'building') return <BuildingScreen prompt={prompt} dots={dots} />
-  if (screen === 'result') return <ResultScreen game={game} onReset={reset} />
+  if (screen === 'result') return <ResultScreen game={game} user={user} onReset={reset} />
 
   return (
     <div style={{ maxWidth: 660, margin: '0 auto', padding: '72px 24px 60px', textAlign: 'center' }}>
       <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 24 }}>
         <StudsLogo size={64} />
       </div>
-      <h1 style={{
-        fontSize: 46, fontWeight: 900, lineHeight: 1.1,
-        letterSpacing: '-0.03em', color: '#fff', marginBottom: 14,
-      }}>
+      <h1 style={{ fontSize: 46, fontWeight: 900, lineHeight: 1.1, letterSpacing: '-0.03em', color: '#fff', marginBottom: 14 }}>
         Describe it.<br />
         <span style={{ color: CYAN }}>AI builds it.</span><br />
         Download it.
@@ -390,22 +505,15 @@ function HomeScreen({ user }) {
         Turn your Roblox game idea into real, working Luau scripts — in seconds.<br />
         No coding required.
       </p>
-
       <div style={{ background: CARD, border: `1.5px solid ${BORDER}`, borderRadius: 16, overflow: 'hidden', textAlign: 'left' }}>
-        <div style={{
-          padding: '10px 16px', background: '#0d0d0d',
-          borderBottom: `1px solid ${BORDER}`,
-          fontSize: 12, color: '#2a6a8a', fontStyle: 'italic',
-        }}>
+        <div style={{ padding: '10px 16px', background: '#0d0d0d', borderBottom: `1px solid ${BORDER}`, fontSize: 12, color: '#2a6a8a', fontStyle: 'italic' }}>
           e.g. {EXAMPLES[exIdx]}
         </div>
         <textarea
           style={{
-            width: '100%', minHeight: 108,
-            background: 'transparent', border: 'none',
+            width: '100%', minHeight: 108, background: 'transparent', border: 'none',
             color: '#e8e8e8', fontSize: 15, lineHeight: 1.65,
-            padding: '16px 20px', resize: 'none', outline: 'none',
-            fontFamily: 'inherit',
+            padding: '16px 20px', resize: 'none', outline: 'none', fontFamily: 'inherit',
           }}
           placeholder="Describe your Roblox game in detail… include mechanics, style, and what makes it fun."
           value={prompt}
@@ -413,47 +521,32 @@ function HomeScreen({ user }) {
           onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) generate() }}
         />
         {error && (
-          <div style={{
-            background: '#1a0808', borderTop: '1px solid #5c1a1a',
-            padding: '10px 16px', color: '#f87171', fontSize: 13,
-          }}>{error}</div>
+          <div style={{ background: '#1a0808', borderTop: '1px solid #5c1a1a', padding: '10px 16px', color: '#f87171', fontSize: 13 }}>{error}</div>
         )}
-        <div style={{
-          padding: '10px 16px', background: '#0d0d0d',
-          borderTop: `1px solid ${BORDER}`,
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        }}>
+        <div style={{ padding: '10px 16px', background: '#0d0d0d', borderTop: `1px solid ${BORDER}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <span style={{ fontSize: 12, color: '#333' }}>Ctrl+Enter to generate</span>
-          <button
-            onClick={generate}
-            disabled={!prompt.trim() || loading}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 8,
-              padding: '10px 22px', borderRadius: 9,
-              border: 'none', cursor: !prompt.trim() || loading ? 'not-allowed' : 'pointer',
-              background: CYAN, color: '#000',
-              fontWeight: 800, fontSize: 14, fontFamily: 'inherit',
-              opacity: !prompt.trim() || loading ? 0.35 : 1,
-            }}>
+          <button onClick={generate} disabled={!prompt.trim() || loading} style={{
+            display: 'flex', alignItems: 'center', gap: 8,
+            padding: '10px 22px', borderRadius: 9, border: 'none',
+            cursor: !prompt.trim() || loading ? 'not-allowed' : 'pointer',
+            background: CYAN, color: '#000', fontWeight: 800, fontSize: 14,
+            fontFamily: 'inherit', opacity: !prompt.trim() || loading ? 0.35 : 1,
+          }}>
             {loading ? <><Spinner />&nbsp;Building…</> : 'Build Game →'}
           </button>
         </div>
       </div>
-
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center', marginTop: 20 }}>
         {CHIPS.map((tag, i) => (
-          <button key={tag}
-            onClick={() => setPrompt(EXAMPLES[i % EXAMPLES.length])}
-            style={{
-              padding: '5px 16px', borderRadius: 20,
-              background: 'transparent', border: `1px solid ${BORDER}`,
-              color: '#444', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit',
-            }}>{tag}</button>
+          <button key={tag} onClick={() => setPrompt(EXAMPLES[i % EXAMPLES.length])} style={{
+            padding: '5px 16px', borderRadius: 20, background: 'transparent',
+            border: `1px solid ${BORDER}`, color: '#444', fontSize: 12,
+            cursor: 'pointer', fontFamily: 'inherit',
+          }}>{tag}</button>
         ))}
       </div>
-
       <div style={{ marginTop: 44, display: 'flex', gap: 28, justifyContent: 'center', flexWrap: 'wrap' }}>
-        {['Logged in with Roblox', 'Real working Luau', 'Download as .rbxmx'].map(f => (
+        {['Logged in with Roblox', 'Real working Luau', 'Publish to Roblox'].map(f => (
           <span key={f} style={{ fontSize: 12, color: '#333', display: 'flex', gap: 6, alignItems: 'center' }}>
             <span style={{ color: CYAN }}>✓</span>{f}
           </span>
@@ -466,7 +559,6 @@ function HomeScreen({ user }) {
 export default function Page({ user, error }) {
   const [currentScreen, setCurrentScreen] = useState('main')
   const handleReset = () => setCurrentScreen('main')
-
   return (
     <>
       <Head>
