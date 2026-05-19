@@ -194,7 +194,7 @@ function PublishModal({ game, user, onClose }) {
           scripts: game.scripts,
           gameName: game.gameName,
           apiKey: apiKey.trim(),
-          userId: user.userId,
+          // userId comes from the session on the server — never trust the client
         }),
       })
       const data = await res.json()
@@ -266,8 +266,16 @@ function PublishModal({ game, user, onClose }) {
               <div style={{
                 background: '#1a0808', border: '1px solid #5c1a1a',
                 borderRadius: 8, padding: '10px 14px', color: '#f87171',
-                fontSize: 12, marginBottom: 12,
-              }}>{status}</div>
+                fontSize: 12, marginBottom: 12, lineHeight: 1.6,
+              }}>
+                <strong>Failed to publish</strong><br />{status}
+                {status.includes('Asset:Write') && (
+                  <div style={{ marginTop: 4, opacity: 0.8 }}>→ Edit your API key at create.roblox.com/credentials and enable Asset:Write</div>
+                )}
+                {status.includes('Invalid API key') && (
+                  <div style={{ marginTop: 4, opacity: 0.8 }}>→ Generate a new key at create.roblox.com/credentials</div>
+                )}
+              </div>
             )}
             <div style={{ display: 'flex', gap: 10 }}>
               <button onClick={onClose} style={{
