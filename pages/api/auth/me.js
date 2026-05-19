@@ -1,4 +1,4 @@
-import { getSession } from '../../lib/session'
+import { getSession } from '../../../lib/session'
 
 export default function handler(req, res) {
   const session = getSession(req)
