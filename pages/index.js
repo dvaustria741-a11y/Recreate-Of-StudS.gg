@@ -178,12 +178,16 @@ function BuildingScreen({ prompt, dots }) {
 
 function PublishModal({ game, user, onClose }) {
   const [apiKey, setApiKey] = useState('')
+  const [universeId, setUniverseId] = useState('')
+  const [placeId, setPlaceId] = useState('')
   const [status, setStatus] = useState('')
   const [loading, setLoading] = useState(false)
-  const [results, setResults] = useState(null)
+  const [versionNumber, setVersionNumber] = useState(null)
+
+  const canPublish = apiKey.trim() && universeId.trim() && placeId.trim()
 
   const publish = async () => {
-    if (!apiKey.trim()) return
+    if (!canPublish) return
     setLoading(true)
     setStatus('')
     try {
@@ -191,21 +195,31 @@ function PublishModal({ game, user, onClose }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          scripts: game.scripts,
+          rbxl: game.rbxl,
           gameName: game.gameName,
           apiKey: apiKey.trim(),
-          userId: user.userId,
+          universeId: universeId.trim(),
+          placeId: placeId.trim(),
         }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Publish failed')
-      setResults(data.results)
+      setVersionNumber(data.versionNumber)
       setStatus('success')
     } catch (e) {
       setStatus(e.message || 'Publish failed')
     }
     setLoading(false)
   }
+
+  const inputStyle = {
+    width: '100%', padding: '10px 14px', borderRadius: 8,
+    background: '#0a0a0a', border: `1px solid ${BORDER}`,
+    color: '#e8e8e8', fontSize: 13, fontFamily: 'inherit',
+    outline: 'none', marginBottom: 10, boxSizing: 'border-box',
+  }
+  const labelStyle = { fontSize: 11, color: '#555', marginBottom: 4, display: 'block', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }
+  const hintStyle = { fontSize: 11, color: '#2a5a6a', marginBottom: 10, lineHeight: 1.5 }
 
   return (
     <div style={{
@@ -215,13 +229,14 @@ function PublishModal({ game, user, onClose }) {
     }}>
       <div style={{
         background: '#111', border: `1px solid ${BORDER}`,
-        borderRadius: 16, padding: 28, width: '100%', maxWidth: 460,
+        borderRadius: 16, padding: 28, width: '100%', maxWidth: 480,
+        maxHeight: '90vh', overflowY: 'auto',
       }}>
-        <div style={{ fontSize: 18, fontWeight: 800, color: '#fff', marginBottom: 6 }}>
+        <div style={{ fontSize: 18, fontWeight: 800, color: '#fff', marginBottom: 4 }}>
           Publish to Roblox
         </div>
         <div style={{ fontSize: 13, color: '#555', marginBottom: 20 }}>
-          Your scripts will be uploaded as Luau assets to your Roblox account.
+          Publishes the .rbxl directly to your Roblox place.
         </div>
 
         {status === 'success' ? (
@@ -231,10 +246,10 @@ function PublishModal({ game, user, onClose }) {
               borderRadius: 8, padding: '14px 18px', color: '#22c55e',
               fontSize: 14, marginBottom: 16, textAlign: 'center',
             }}>
-              ✓ {results?.length} scripts published to Roblox!
+              Published — version {versionNumber}
             </div>
             <div style={{ fontSize: 12, color: '#555', marginBottom: 20 }}>
-              Find them in Roblox Studio → Toolbox → My Models
+              Open Roblox Studio and your place will be updated.
             </div>
             <button onClick={onClose} style={{
               width: '100%', padding: '11px', borderRadius: 8,
@@ -244,46 +259,54 @@ function PublishModal({ game, user, onClose }) {
           </div>
         ) : (
           <div>
-            <div style={{ fontSize: 12, color: '#555', marginBottom: 6 }}>
-              Open Cloud API Key
+            <label style={labelStyle}>Open Cloud API Key</label>
+            <div style={hintStyle}>
+              create.roblox.com/credentials → API Keys → Create → enable <strong style={{color:CYAN}}>Place:Write</strong> (not Asset:Write)
             </div>
-            <div style={{ fontSize: 11, color: '#2a5a6a', marginBottom: 10 }}>
-              Get it from create.roblox.com/credentials → API Keys → Create → enable Asset:Write
+            <input type="password" placeholder="API key..." value={apiKey}
+              onChange={e => setApiKey(e.target.value)} style={inputStyle} />
+
+            <label style={labelStyle}>Universe ID</label>
+            <div style={hintStyle}>
+              create.roblox.com → your game → Creator Dashboard → URL contains the Universe ID
             </div>
-            <input
-              type="password"
-              placeholder="Paste your Open Cloud API key..."
-              value={apiKey}
-              onChange={e => setApiKey(e.target.value)}
-              style={{
-                width: '100%', padding: '11px 14px', borderRadius: 8,
-                background: '#0a0a0a', border: `1px solid ${BORDER}`,
-                color: '#e8e8e8', fontSize: 13, fontFamily: 'inherit',
-                outline: 'none', marginBottom: 12, boxSizing: 'border-box',
-              }}
-            />
-            {status && status !== 'success' && (
+            <input type="text" placeholder="e.g. 123456789" value={universeId}
+              onChange={e => setUniverseId(e.target.value)} style={inputStyle} />
+
+            <label style={labelStyle}>Place ID</label>
+            <div style={hintStyle}>
+              Roblox Studio → File → Game Settings → the Place ID shown at the top
+            </div>
+            <input type="text" placeholder="e.g. 987654321" value={placeId}
+              onChange={e => setPlaceId(e.target.value)} style={inputStyle} />
+
+            {status && (
               <div style={{
                 background: '#1a0808', border: '1px solid #5c1a1a',
                 borderRadius: 8, padding: '10px 14px', color: '#f87171',
-                fontSize: 12, marginBottom: 12,
-              }}>{status}</div>
+                fontSize: 12, marginBottom: 12, lineHeight: 1.6,
+              }}>
+                {status}
+                {status.includes('403') && <div style={{marginTop:4,opacity:0.8}}>→ Make sure the API key has Place:Write permission enabled.</div>}
+                {status.includes('401') && <div style={{marginTop:4,opacity:0.8}}>→ API key is invalid or expired.</div>}
+              </div>
             )}
+
             <div style={{ display: 'flex', gap: 10 }}>
               <button onClick={onClose} style={{
                 flex: 1, padding: '11px', borderRadius: 8,
                 background: 'transparent', border: `1px solid ${BORDER}`,
                 color: '#555', cursor: 'pointer', fontSize: 13, fontFamily: 'inherit',
               }}>Cancel</button>
-              <button onClick={publish} disabled={!apiKey.trim() || loading} style={{
+              <button onClick={publish} disabled={!canPublish || loading} style={{
                 flex: 2, padding: '11px', borderRadius: 8,
                 background: CYAN, color: '#000', border: 'none',
-                fontWeight: 800, fontSize: 13,
-                cursor: !apiKey.trim() || loading ? 'not-allowed' : 'pointer',
-                fontFamily: 'inherit', opacity: !apiKey.trim() || loading ? 0.5 : 1,
+                fontWeight: 800, fontSize: 13, fontFamily: 'inherit',
+                cursor: !canPublish || loading ? 'not-allowed' : 'pointer',
+                opacity: !canPublish || loading ? 0.5 : 1,
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
               }}>
-                {loading ? <><Spinner />Publishing…</> : '🚀 Publish'}
+                {loading ? <><Spinner />Publishing…</> : 'Publish'}
               </button>
             </div>
           </div>
