@@ -8,13 +8,8 @@ export default async function handler(req, res) {
     return res.redirect('/?error=access_denied')
   }
 
-  if (!code || !state) {
+  if (!code) {
     return res.redirect('/?error=missing_params')
-  }
-
-  const cookies = parse(req.headers.cookie || '')
-  if (!cookies.oauth_state || cookies.oauth_state !== state) {
-    return res.redirect('/?error=invalid_state')
   }
 
   try {
@@ -54,11 +49,6 @@ export default async function handler(req, res) {
       avatar: user.picture || null,
       accessToken: tokens.access_token,
     })
-
-    res.setHeader('Set-Cookie', [
-      ...([].concat(res.getHeader('Set-Cookie') || [])),
-      serialize('oauth_state', '', { path: '/', maxAge: 0 }),
-    ])
 
     res.redirect('/')
   } catch (err) {
