@@ -2,7 +2,7 @@ import { getSession } from '../../lib/session'
 
 const SYSTEM_PROMPT = `You are an expert Roblox Luau game developer. Generate complete, working Roblox game scripts.
 
-Return ONLY a raw JSON object â€” no markdown, no code fences, no extra text. Structure:
+Return ONLY a raw JSON object — no markdown, no code fences, no extra text. Structure:
 {
   "gameName": "Name Here",
   "gameDescription": "One sentence description",
@@ -27,16 +27,9 @@ Rules:
 - type must be exactly one of: Script, LocalScript, ModuleScript
 - location must be one of: ServerScriptService, StarterPlayerScripts, StarterGui, ReplicatedStorage, Workspace`
 
-// Build a .rbxmx (Roblox model XML) so users can drag-and-drop into Studio
 function buildRbxmx(scripts) {
   const items = scripts.map((s, i) => {
     const ref = `RBX${i}`
-    // Escape XML special characters in code
-    const escapedCode = s.code
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-
     return `  <Item class="${s.type}" referent="${ref}">
     <Properties>
       <string name="Name">${s.name}</string>
@@ -56,7 +49,6 @@ ${items}
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end()
 
-  // Must be logged in
   const session = getSession(req)
   if (!session) return res.status(401).json({ error: 'Not logged in' })
 
@@ -66,20 +58,44 @@ export default async function handler(req, res) {
   }
 
   try {
-    const claudeRes = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': process.env.ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 4000,
-        system: SYSTEM_PROMPT,
-        messages: [{ role: 'user', content: `Create a Roblox game: ${prompt}` }],
-      }),
-    })
+    const geminiRes = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{
+            parts: [{
+              text: SYSTEM_PROMPT + '\n\nCreate a Roblox game: ' + prompt
+            }]
+          }]
+        }),
+      }
+    )
+
+    if (!geminiRes.ok) {
+      const err = await geminiRes.text()
+      console.error('Gemini API error:', err)
+      return res.status(502).json({ error: 'AI generation failed' })
+    }
+
+    const geminiData = await geminiRes.json()
+    const raw = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || ''
+
+    const cleaned = raw
+      .replace(/^```(?:json)?\s*/i, '')
+      .replace(/\s*```\s*$/, '')
+      .trim()
+
+    const game = JSON.parse(cleaned)
+    game.rbxmx = buildRbxmx(game.scripts || [])
+
+    return res.status(200).json({ game })
+  } catch (err) {
+    console.error('Generate error:', err)
+    return res.status(500).json({ error: 'Server error: ' + err.message })
+  }
+}    })
 
     if (!claudeRes.ok) {
       const err = await claudeRes.text()
