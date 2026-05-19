@@ -255,61 +255,52 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Step 1: Quick keyword extraction to search for free assets
-    // We do a lightweight AI call first to get asset keywords
+    // Step 1: Quick keyword extraction using a cheap OpenRouter model
     let freeAssets = []
     try {
-      const kwRes = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${process.env.GEMINI_API_KEY}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{
-              parts: [{
-                text: `Given this Roblox game description: "${prompt}"
+      const kwRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
+          'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || 'https://studs.gg',
+          'X-Title': 'Studs.gg',
+        },
+        body: JSON.stringify({
+          model: 'google/gemini-2.0-flash-lite-001',
+          max_tokens: 120,
+          temperature: 0.2,
+          messages: [{
+            role: 'user',
+            content: `Given this Roblox game description: "${prompt}"
 List 4 short keywords (1-2 words each) for free 3D models to search on Roblox Creator Store.
-Reply ONLY with a JSON array of strings. Example: ["tree","building","sword","chest"]`
-              }]
-            }]
-          }),
-        }
-      )
+Reply ONLY with a JSON array of strings. Example: ["tree","building","sword","chest"]`,
+          }],
+        }),
+      })
       if (kwRes.ok) {
         const kwData = await kwRes.json()
-        const kwRaw = kwData.candidates?.[0]?.content?.parts?.[0]?.text || '[]'
+        const kwRaw = kwData.choices?.[0]?.message?.content || '[]'
         const kwCleaned = kwRaw.replace(/```(?:json)?/g, '').trim()
         const keywords = JSON.parse(kwCleaned)
-        if (Array.isArray(keywords)) {
-          freeAssets = await searchFreeModels(keywords)
-        }
+        if (Array.isArray(keywords)) freeAssets = await searchFreeModels(keywords)
       }
     } catch {
       // Asset search failed — continue without assets
     }
 
-    // Step 2: Generate the full game — try 6 models in order until one works
-    const systemPrompt = buildSystemPrompt(freeAssets)
-
-    // Best quality first, fall through to faster/lighter models
+    // Step 2: Generate full game — try models in order until one works
+    // Free models (marked :free) have no cost, paid ones are fallbacks for quality
     const MODELS = [
-      'gemini-2.5-pro-preview-05-06',
-      'gemini-2.5-pro',
-      'gemini-2.5-flash',
-      'gemini-2.5-flash-lite-preview-06-17',
-      'gemini-2.0-flash',
-      'gemini-2.0-flash-lite',
+      'google/gemini-2.5-pro',
+      'google/gemini-2.5-flash',
+      'google/gemini-2.0-flash-001',
+      'meta-llama/llama-4-maverick:free',
+      'meta-llama/llama-4-scout:free',
+      'google/gemini-2.0-flash-lite-001',
     ]
 
-    const requestBody = {
-      system_instruction: { parts: [{ text: systemPrompt }] },
-      contents: [{ parts: [{ text: `Create this complete Roblox game. Be thorough — generate every script needed for a polished, shippable game:\n\n${prompt}` }] }],
-      generationConfig: {
-        maxOutputTokens: 65536,
-        temperature: 0.4,
-        responseMimeType: 'application/json',
-      },
-    }
+    const systemPrompt = buildSystemPrompt(freeAssets)
 
     let raw = ''
     let modelUsed = ''
@@ -318,28 +309,45 @@ Reply ONLY with a JSON array of strings. Example: ["tree","building","sword","ch
     for (const model of MODELS) {
       try {
         console.log(`Trying model: ${model}`)
-        const geminiRes = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(requestBody),
-          }
-        )
+        const orRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
+            'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || 'https://studs.gg',
+            'X-Title': 'Studs.gg',
+          },
+          body: JSON.stringify({
+            model,
+            max_tokens: 65536,
+            temperature: 0.4,
+            response_format: { type: 'json_object' },
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: `Create this complete Roblox game. Be thorough — generate every script needed for a polished, shippable game:\n\n${prompt}` },
+            ],
+          }),
+        })
 
-        if (!geminiRes.ok) {
-          const errText = await geminiRes.text()
-          lastError = `${model} failed (HTTP ${geminiRes.status}): ${errText.slice(0, 200)}`
+        if (!orRes.ok) {
+          const errText = await orRes.text()
+          lastError = `${model} failed (HTTP ${orRes.status}): ${errText.slice(0, 300)}`
           console.warn(lastError)
           continue
         }
 
-        const geminiData = await geminiRes.json()
-        const candidate = geminiData.candidates?.[0]
-        const text = candidate?.content?.parts?.[0]?.text || ''
+        const orData = await orRes.json()
 
+        // OpenRouter sometimes wraps errors inside a 200
+        if (orData.error) {
+          lastError = `${model} error: ${orData.error.message || JSON.stringify(orData.error)}`
+          console.warn(lastError)
+          continue
+        }
+
+        const text = orData.choices?.[0]?.message?.content || ''
         if (!text) {
-          lastError = `${model} returned empty (finishReason: ${candidate?.finishReason || 'unknown'})`
+          lastError = `${model} returned empty content`
           console.warn(lastError)
           continue
         }
@@ -357,9 +365,9 @@ Reply ONLY with a JSON array of strings. Example: ["tree","building","sword","ch
     }
 
     if (!raw) {
-      console.error('All 6 models failed. Last error:', lastError)
+      console.error('All models failed. Last error:', lastError)
       return res.status(502).json({
-        error: `All AI models failed. ${lastError}. Check your GEMINI_API_KEY is valid and has Gemini API access enabled.`,
+        error: `All AI models failed. ${lastError}. Check your OPENROUTER_API_KEY in Vercel environment variables.`,
       })
     }
 
