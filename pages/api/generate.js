@@ -260,7 +260,7 @@ export default async function handler(req, res) {
     let freeAssets = []
     try {
       const kwRes = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${process.env.GEMINI_API_KEY}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${process.env.GEMINI_API_KEY}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -288,39 +288,79 @@ Reply ONLY with a JSON array of strings. Example: ["tree","building","sword","ch
       // Asset search failed — continue without assets
     }
 
-    // Step 2: Generate the full game with all scripts
+    // Step 2: Generate the full game — try 6 models in order until one works
     const systemPrompt = buildSystemPrompt(freeAssets)
 
-    const geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro-preview-05-06:generateContent?key=${process.env.GEMINI_API_KEY}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          system_instruction: { parts: [{ text: systemPrompt }] },
-          contents: [{ parts: [{ text: `Create this complete Roblox game. Be thorough — generate every script needed for a polished, shippable game:\n\n${prompt}` }] }],
-          generationConfig: {
-            maxOutputTokens: 65536,
-            temperature: 0.4,
-            responseMimeType: 'application/json',
-          },
-        }),
-      }
-    )
+    // Best quality first, fall through to faster/lighter models
+    const MODELS = [
+      'gemini-2.5-pro-preview-05-06',
+      'gemini-2.5-pro',
+      'gemini-2.5-flash',
+      'gemini-2.5-flash-lite-preview-06-17',
+      'gemini-2.0-flash',
+      'gemini-2.0-flash-lite',
+    ]
 
-    if (!geminiRes.ok) {
-      const err = await geminiRes.text()
-      console.error('Gemini API error:', err)
-      return res.status(502).json({ error: 'AI generation failed — check GEMINI_API_KEY' })
+    const requestBody = {
+      system_instruction: { parts: [{ text: systemPrompt }] },
+      contents: [{ parts: [{ text: `Create this complete Roblox game. Be thorough — generate every script needed for a polished, shippable game:\n\n${prompt}` }] }],
+      generationConfig: {
+        maxOutputTokens: 65536,
+        temperature: 0.4,
+        responseMimeType: 'application/json',
+      },
     }
 
-    const geminiData = await geminiRes.json()
-    const raw = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || ''
+    let raw = ''
+    let modelUsed = ''
+    let lastError = ''
+
+    for (const model of MODELS) {
+      try {
+        console.log(`Trying model: ${model}`)
+        const geminiRes = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(requestBody),
+          }
+        )
+
+        if (!geminiRes.ok) {
+          const errText = await geminiRes.text()
+          lastError = `${model} failed (HTTP ${geminiRes.status}): ${errText.slice(0, 200)}`
+          console.warn(lastError)
+          continue
+        }
+
+        const geminiData = await geminiRes.json()
+        const candidate = geminiData.candidates?.[0]
+        const text = candidate?.content?.parts?.[0]?.text || ''
+
+        if (!text) {
+          lastError = `${model} returned empty (finishReason: ${candidate?.finishReason || 'unknown'})`
+          console.warn(lastError)
+          continue
+        }
+
+        raw = text
+        modelUsed = model
+        console.log(`Success with: ${model}`)
+        break
+
+      } catch (err) {
+        lastError = `${model} threw: ${err.message}`
+        console.warn(lastError)
+        continue
+      }
+    }
 
     if (!raw) {
-      const blocked = geminiData.candidates?.[0]?.finishReason
-      console.error('Empty Gemini response, finishReason:', blocked, JSON.stringify(geminiData).slice(0, 500))
-      return res.status(502).json({ error: `Generation returned empty response (reason: ${blocked || 'unknown'})` })
+      console.error('All 6 models failed. Last error:', lastError)
+      return res.status(502).json({
+        error: `All AI models failed. ${lastError}. Check your GEMINI_API_KEY is valid and has Gemini API access enabled.`,
+      })
     }
 
     const cleaned = raw
@@ -329,6 +369,7 @@ Reply ONLY with a JSON array of strings. Example: ["tree","building","sword","ch
       .trim()
 
     const game = JSON.parse(cleaned)
+    game.modelUsed = modelUsed
 
     // Attach free asset info for display in UI
     game.freeAssetsUsed = freeAssets
