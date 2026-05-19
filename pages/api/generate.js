@@ -38,7 +38,6 @@ function buildRbxmx(scripts) {
     </Properties>
   </Item>`
   }).join('\n')
-
   return `<roblox xmlns:xmime="http://www.w3.org/2005/05/xmlmime" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://www.roblox.com/roblox.xsd" version="4">
   <External>null</External>
   <External>nil</External>
@@ -48,15 +47,12 @@ ${items}
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end()
-
   const session = getSession(req)
   if (!session) return res.status(401).json({ error: 'Not logged in' })
-
   const { prompt } = req.body
   if (!prompt || prompt.trim().length < 5) {
     return res.status(400).json({ error: 'Prompt too short' })
   }
-
   try {
     const geminiRes = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${process.env.GEMINI_API_KEY}`,
@@ -64,83 +60,24 @@ export default async function handler(req, res) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          system_instruction: {
-            parts: [{ text: SYSTEM_PROMPT }]
-          },
-          contents: [{
-            parts: [{ text: `Create a Roblox game: ${prompt}` }]
-          }]
+          system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
+          contents: [{ parts: [{ text: `Create a Roblox game: ${prompt}` }] }]
         }),
       }
     )
-
     if (!geminiRes.ok) {
       const err = await geminiRes.text()
       console.error('Gemini API error:', err)
       return res.status(502).json({ error: 'AI generation failed' })
     }
-
     const geminiData = await geminiRes.json()
     const raw = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || ''
-
     const cleaned = raw
       .replace(/^```(?:json)?\s*/i, '')
       .replace(/\s*```\s*$/, '')
       .trim()
-
     const game = JSON.parse(cleaned)
     game.rbxmx = buildRbxmx(game.scripts || [])
-
-    return res.status(200).json({ game })
-  } catch (err) {
-    console.error('Generate error:', err)
-    return res.status(500).json({ error: 'Server error: ' + err.message })
-  }
-}      const err = await geminiRes.text()
-      console.error('Gemini API error:', err)
-      return res.status(502).json({ error: 'AI generation failed' })
-    }
-
-    const geminiData = await geminiRes.json()
-    const raw = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || ''
-
-    const cleaned = raw
-      .replace(/^```(?:json)?\s*/i, '')
-      .replace(/\s*```\s*$/, '')
-      .trim()
-
-    const game = JSON.parse(cleaned)
-    game.rbxmx = buildRbxmx(game.scripts || [])
-
-    return res.status(200).json({ game })
-  } catch (err) {
-    console.error('Generate error:', err)
-    return res.status(500).json({ error: 'Server error: ' + err.message })
-  }
-}    })
-
-    if (!claudeRes.ok) {
-      const err = await claudeRes.text()
-      console.error('Claude API error:', err)
-      return res.status(502).json({ error: 'AI generation failed' })
-    }
-
-    const claudeData = await claudeRes.json()
-    const raw = (claudeData.content || [])
-      .filter(b => b.type === 'text')
-      .map(b => b.text)
-      .join('')
-
-    const cleaned = raw
-      .replace(/^```(?:json)?\s*/i, '')
-      .replace(/\s*```\s*$/, '')
-      .trim()
-
-    const game = JSON.parse(cleaned)
-
-    // Attach the .rbxmx file content for download
-    game.rbxmx = buildRbxmx(game.scripts || [])
-
     return res.status(200).json({ game })
   } catch (err) {
     console.error('Generate error:', err)
