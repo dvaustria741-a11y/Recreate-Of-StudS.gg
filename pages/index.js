@@ -17,8 +17,6 @@ const EXAMPLES = [
 
 const CHIPS = ['Obby', 'Tycoon', 'Simulator', 'Battle Royale', 'Horror', 'Racing']
 
-// ── Small components ────────────────────────────────────────────────
-
 function StudsLogo({ size = 44 }) {
   return (
     <svg width={size} height={size} viewBox="0 0 100 100" fill="none">
@@ -75,8 +73,6 @@ function Avatar({ user }) {
   )
 }
 
-// ── Nav ─────────────────────────────────────────────────────────────
-
 function Nav({ user, onReset }) {
   return (
     <nav style={{
@@ -98,7 +94,7 @@ function Nav({ user, onReset }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <Avatar user={user} />
           <span style={{ fontSize: 13, color: '#888' }}>{user.username}</span>
-          <a href="/api/logout" style={{
+          <a href="/api/auth/logout" style={{
             fontSize: 12, color: '#444', textDecoration: 'none',
             padding: '5px 12px', border: `1px solid ${BORDER}`,
             borderRadius: 6,
@@ -115,8 +111,6 @@ function Nav({ user, onReset }) {
     </nav>
   )
 }
-
-// ── Login screen ─────────────────────────────────────────────────────
 
 function LoginScreen({ error }) {
   return (
@@ -144,7 +138,7 @@ function LoginScreen({ error }) {
         </div>
       )}
 
-      <a href="/api/login" style={{
+      <a href="/api/auth/login" style={{
         display: 'inline-flex', alignItems: 'center', gap: 12,
         padding: '14px 32px', borderRadius: 12,
         background: CYAN, color: '#000',
@@ -167,8 +161,6 @@ function LoginScreen({ error }) {
   )
 }
 
-// ── Building screen ──────────────────────────────────────────────────
-
 function BuildingScreen({ prompt, dots }) {
   return (
     <div style={{
@@ -181,7 +173,7 @@ function BuildingScreen({ prompt, dots }) {
       </div>
       <div>
         <div style={{ fontSize: 26, fontWeight: 800, color: '#fff' }}>Building your game{dots}</div>
-        <div style={{ fontSize: 14, color: '#444', marginTop: 6 }}>Claude is writing your Luau scripts</div>
+        <div style={{ fontSize: 14, color: '#444', marginTop: 6 }}>AI is writing your Luau scripts</div>
       </div>
       <div style={{ width: 300, height: 3, background: '#1c1c1c', borderRadius: 2, overflow: 'hidden' }}>
         <div style={{ height: '100%', background: CYAN, borderRadius: 2, animation: 'progress 3s ease-in-out infinite' }} />
@@ -190,8 +182,6 @@ function BuildingScreen({ prompt, dots }) {
     </div>
   )
 }
-
-// ── Result screen ────────────────────────────────────────────────────
 
 function ResultScreen({ game, onReset }) {
   const [activeScript, setActiveScript] = useState(0)
@@ -209,157 +199,103 @@ function ResultScreen({ game, onReset }) {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `${game.gameName.replace(/\s+/g, '_')}.rbxmx`
+    a.download = `${game.gameName || 'game'}.rbxmx`
     a.click()
     URL.revokeObjectURL(url)
   }
 
+  const s = (game.scripts || [])[activeScript] || {}
+
   return (
-    <div style={{ maxWidth: 920, margin: '0 auto', padding: '32px 24px 80px' }}>
-
-      {/* Header */}
-      <div style={{
-        display: 'flex', alignItems: 'flex-start',
-        justifyContent: 'space-between', marginBottom: 28, gap: 16, flexWrap: 'wrap',
-      }}>
-        <div>
-          <div style={{ fontSize: 26, fontWeight: 800, color: '#fff', marginBottom: 4 }}>{game.gameName}</div>
-          <div style={{ fontSize: 13, color: '#555' }}>{game.gameDescription}</div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
-            {(game.features || []).map((f, i) => (
-              <span key={i} style={{
-                fontSize: 12, padding: '3px 12px', borderRadius: 20,
-                background: '#001a2e', border: '1px solid #003355', color: CYAN,
-              }}>✓ {f}</span>
-            ))}
-          </div>
+    <div style={{ maxWidth: 780, margin: '0 auto', padding: '32px 20px 60px' }}>
+      <div style={{ marginBottom: 24 }}>
+        <div style={{ fontSize: 11, color: '#2a6a8a', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 6 }}>Generated Game</div>
+        <h2 style={{ fontSize: 28, fontWeight: 900, color: '#fff', marginBottom: 8 }}>{game.gameName}</h2>
+        <p style={{ fontSize: 14, color: '#555', marginBottom: 16 }}>{game.gameDescription}</p>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 20 }}>
+          {(game.features || []).map((f, i) => (
+            <span key={i} style={{
+              fontSize: 12, padding: '4px 12px', borderRadius: 20,
+              background: '#001a2e', color: CYAN, border: `1px solid #0a3a5a`,
+            }}>{f}</span>
+          ))}
         </div>
-
         <button onClick={downloadRbxmx} style={{
-          display: 'flex', alignItems: 'center', gap: 8,
-          padding: '12px 20px', borderRadius: 10, border: 'none',
-          background: CYAN, color: '#000', fontWeight: 800,
-          fontSize: 14, cursor: 'pointer', flexShrink: 0,
-        }}>
-          ↓ Download .rbxmx
-        </button>
+          padding: '10px 20px', borderRadius: 8,
+          background: CYAN, color: '#000', border: 'none',
+          fontWeight: 800, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit',
+        }}>⬇ Download .rbxmx</button>
       </div>
 
-      {/* Download info */}
-      <div style={{
-        background: '#001a2e', border: '1px solid #003355',
-        borderRadius: 10, padding: '13px 18px', marginBottom: 24,
-        fontSize: 13, color: '#5599cc',
-        display: 'flex', gap: 10, alignItems: 'flex-start',
-      }}>
-        <span style={{ fontSize: 18, flexShrink: 0 }}>💡</span>
-        <span>
-          <strong style={{ color: CYAN }}>How to import:</strong> Download the .rbxmx file →
-          open Roblox Studio → drag the file into the viewport or use <em>File → Import</em>.
-          Scripts are placed automatically — just move them to the correct service in Explorer.
-        </span>
-      </div>
-
-      {/* Tabs */}
-      <div style={{ display: 'flex', borderBottom: `1px solid ${BORDER}`, marginBottom: 24 }}>
-        {[['scripts', 'Scripts'], ['setup', 'Setup Guide']].map(([id, label]) => (
-          <button key={id} onClick={() => setTab(id)} style={{
-            padding: '10px 22px', fontSize: 13, fontWeight: 600,
-            background: 'transparent', border: 'none',
-            color: tab === id ? CYAN : '#444',
-            cursor: 'pointer', fontFamily: 'inherit',
-            borderBottom: tab === id ? `2px solid ${CYAN}` : '2px solid transparent',
-            marginBottom: -1, transition: 'color 0.15s',
-          }}>{label}</button>
+      <div style={{ display: 'flex', gap: 0, borderBottom: `1px solid ${BORDER}`, marginBottom: 20 }}>
+        {['scripts', 'setup'].map(t => (
+          <button key={t} onClick={() => setTab(t)} style={{
+            padding: '8px 18px', background: 'none', border: 'none',
+            borderBottom: tab === t ? `2px solid ${CYAN}` : '2px solid transparent',
+            color: tab === t ? CYAN : '#444', fontWeight: 700, fontSize: 13,
+            cursor: 'pointer', fontFamily: 'inherit', textTransform: 'capitalize',
+          }}>{t}</button>
         ))}
       </div>
 
       {tab === 'scripts' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: 14 }}>
-          {/* Script list */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            {(game.scripts || []).map((s, i) => (
+        <div style={{ display: 'flex', gap: 16, flexDirection: 'column' }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {(game.scripts || []).map((sc, i) => (
               <button key={i} onClick={() => setActiveScript(i)} style={{
-                padding: '10px 14px', borderRadius: 8, textAlign: 'left',
-                background: activeScript === i ? '#001a2e' : 'transparent',
-                border: activeScript === i ? '1px solid #003355' : '1px solid transparent',
-                color: activeScript === i ? '#e8e8e8' : '#555',
-                cursor: 'pointer', fontFamily: 'inherit',
-                fontSize: 13, fontWeight: activeScript === i ? 600 : 400,
-                transition: 'all 0.15s',
-              }}>
-                <div style={{ marginBottom: 5 }}>{s.name}</div>
-                <TypePill type={s.type} />
-              </button>
+                padding: '6px 14px', borderRadius: 7, border: `1px solid ${i === activeScript ? CYAN : BORDER}`,
+                background: i === activeScript ? '#001a2e' : 'transparent',
+                color: i === activeScript ? CYAN : '#555',
+                fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'monospace',
+              }}>{sc.name}</button>
             ))}
           </div>
 
-          {/* Code view */}
-          {game.scripts?.[activeScript] && (() => {
-            const s = game.scripts[activeScript]
-            return (
-              <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, overflow: 'hidden' }}>
-                <div style={{
-                  display: 'flex', alignItems: 'center', gap: 10,
-                  padding: '12px 16px', borderBottom: `1px solid ${BORDER}`,
-                  background: '#0d0d0d', flexWrap: 'wrap',
-                }}>
+          {s.name && (
+            <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, overflow: 'hidden' }}>
+              <div style={{
+                padding: '10px 16px', background: '#0d0d0d',
+                borderBottom: `1px solid ${BORDER}`,
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: '#e8e8e8', fontFamily: 'monospace' }}>{s.name}</span>
                   <TypePill type={s.type} />
-                  <span style={{
-                    fontSize: 11, padding: '2px 9px', borderRadius: 4,
-                    background: '#0d0d0d', border: `1px solid ${BORDER}`,
-                    color: '#444', fontFamily: 'monospace',
-                  }}>{s.location}</span>
-                  {s.description && (
-                    <span style={{ fontSize: 12, color: '#444', flex: 1 }}>{s.description}</span>
-                  )}
-                  <button onClick={() => copy(s.code, activeScript)} style={{
-                    padding: '5px 14px', background: 'transparent',
-                    border: `1px solid ${copied === activeScript ? '#1a5c1a' : BORDER}`,
-                    borderRadius: 6,
-                    color: copied === activeScript ? '#22c55e' : '#444',
-                    cursor: 'pointer', fontSize: 12, fontFamily: 'inherit',
-                  }}>
-                    {copied === activeScript ? '✓ Copied' : 'Copy'}
-                  </button>
+                  <span style={{ fontSize: 11, color: '#333', fontFamily: 'monospace' }}>{s.location}</span>
                 </div>
-                <pre style={{
-                  margin: 0, padding: 20, overflowX: 'auto',
-                  fontFamily: "'Fira Code','Cascadia Code','Courier New',monospace",
-                  fontSize: 12.5, lineHeight: 1.75, color: '#5a8aaa',
-                  maxHeight: 500, overflowY: 'auto',
-                  whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-                }}>{s.code}</pre>
+                <button onClick={() => copy(s.code, s.name)} style={{
+                  padding: '4px 12px', borderRadius: 6, border: `1px solid ${BORDER}`,
+                  background: 'transparent', color: copied === s.name ? '#22c55e' : '#555',
+                  fontSize: 11, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap',
+                }}>{copied === s.name ? '✓ Copied' : 'Copy'}</button>
               </div>
-            )
-          })()}
+              <div style={{ fontSize: 11, color: '#444', padding: '8px 16px', borderBottom: `1px solid ${BORDER}` }}>{s.description}</div>
+              <pre style={{
+                margin: 0, padding: '16px 20px', overflowX: 'auto',
+                fontSize: 12, lineHeight: 1.7, color: '#a8d8a8',
+                fontFamily: "'Fira Code', 'Cascadia Code', monospace",
+                maxHeight: 420,
+              }}>{s.code}</pre>
+            </div>
+          )}
         </div>
       )}
 
       {tab === 'setup' && (
-        <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, padding: 24 }}>
-          <div style={{ fontSize: 15, fontWeight: 700, color: '#fff', marginBottom: 20 }}>
-            Setting up <span style={{ color: CYAN }}>{game.gameName}</span> in Roblox Studio
+        <div>
+          <div style={{ marginBottom: 20 }}>
+            {(game.setupSteps || []).map((step, i) => (
+              <div key={i} style={{ display: 'flex', gap: 14, alignItems: 'flex-start', marginBottom: 14 }}>
+                <div style={{
+                  width: 26, height: 26, borderRadius: '50%',
+                  background: CYAN, color: '#000',
+                  fontSize: 12, fontWeight: 800, flexShrink: 0,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>{i + 1}</div>
+                <div style={{ fontSize: 13, color: '#888', lineHeight: 1.65, paddingTop: 3 }}>{step}</div>
+              </div>
+            ))}
           </div>
-          {[
-            'Open Roblox Studio → create a new Baseplate place',
-            'Download the .rbxmx file using the button above',
-            'Drag the .rbxmx file into the Roblox Studio viewport — scripts appear in the Explorer',
-            ...(game.setupSteps || []),
-            'Move each script to the correct service shown in the Scripts tab',
-            'Press ▶ Play to test your game',
-            'Publish via File → Publish to Roblox As…',
-          ].map((step, i) => (
-            <div key={i} style={{ display: 'flex', gap: 14, alignItems: 'flex-start', marginBottom: 14 }}>
-              <div style={{
-                width: 26, height: 26, borderRadius: '50%',
-                background: CYAN, color: '#000',
-                fontSize: 12, fontWeight: 800, flexShrink: 0,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}>{i + 1}</div>
-              <div style={{ fontSize: 13, color: '#888', lineHeight: 1.65, paddingTop: 3 }}>{step}</div>
-            </div>
-          ))}
 
           <div style={{ marginTop: 20, padding: 16, background: '#0d0d0d', borderRadius: 8, border: `1px solid ${BORDER}` }}>
             <div style={{ fontSize: 11, color: '#333', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 10, fontWeight: 700 }}>Script placement</div>
@@ -388,11 +324,9 @@ function ResultScreen({ game, onReset }) {
   )
 }
 
-// ── Home screen ──────────────────────────────────────────────────────
-
 function HomeScreen({ user }) {
   const [prompt, setPrompt] = useState('')
-  const [screen, setScreen] = useState('home') // home | building | result
+  const [screen, setScreen] = useState('home')
   const [game, setGame] = useState(null)
   const [error, setError] = useState('')
   const [exIdx, setExIdx] = useState(0)
@@ -529,11 +463,8 @@ function HomeScreen({ user }) {
   )
 }
 
-// ── Page ─────────────────────────────────────────────────────────────
-
 export default function Page({ user, error }) {
   const [currentScreen, setCurrentScreen] = useState('main')
-
   const handleReset = () => setCurrentScreen('main')
 
   return (
