@@ -180,7 +180,7 @@ function PublishModal({ game, user, onClose }) {
   const [apiKey, setApiKey] = useState('')
   const [status, setStatus] = useState('')
   const [loading, setLoading] = useState(false)
-  const [assetId, setAssetId] = useState(null)
+  const [results, setResults] = useState(null)
 
   const publish = async () => {
     if (!apiKey.trim()) return
@@ -191,7 +191,7 @@ function PublishModal({ game, user, onClose }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          rbxmx: game.rbxmx,
+          scripts: game.scripts,
           gameName: game.gameName,
           apiKey: apiKey.trim(),
           userId: user.userId,
@@ -199,7 +199,7 @@ function PublishModal({ game, user, onClose }) {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Publish failed')
-      setAssetId(data.assetId)
+      setResults(data.results)
       setStatus('success')
     } catch (e) {
       setStatus(e.message || 'Publish failed')
@@ -221,7 +221,7 @@ function PublishModal({ game, user, onClose }) {
           Publish to Roblox
         </div>
         <div style={{ fontSize: 13, color: '#555', marginBottom: 20 }}>
-          Your scripts will be uploaded as a Model asset to your Roblox account.
+          Your scripts will be uploaded as Luau assets to your Roblox account.
         </div>
 
         {status === 'success' ? (
@@ -231,10 +231,10 @@ function PublishModal({ game, user, onClose }) {
               borderRadius: 8, padding: '14px 18px', color: '#22c55e',
               fontSize: 14, marginBottom: 16, textAlign: 'center',
             }}>
-              ✓ Published! Asset ID: <strong>{assetId}</strong>
+              ✓ {results?.length} scripts published to Roblox!
             </div>
             <div style={{ fontSize: 12, color: '#555', marginBottom: 20 }}>
-              Find it in Roblox Studio → Toolbox → My Models
+              Find them in Roblox Studio → Toolbox → My Models
             </div>
             <button onClick={onClose} style={{
               width: '100%', padding: '11px', borderRadius: 8,
@@ -278,7 +278,8 @@ function PublishModal({ game, user, onClose }) {
               <button onClick={publish} disabled={!apiKey.trim() || loading} style={{
                 flex: 2, padding: '11px', borderRadius: 8,
                 background: CYAN, color: '#000', border: 'none',
-                fontWeight: 800, fontSize: 13, cursor: !apiKey.trim() || loading ? 'not-allowed' : 'pointer',
+                fontWeight: 800, fontSize: 13,
+                cursor: !apiKey.trim() || loading ? 'not-allowed' : 'pointer',
                 fontFamily: 'inherit', opacity: !apiKey.trim() || loading ? 0.5 : 1,
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
               }}>
