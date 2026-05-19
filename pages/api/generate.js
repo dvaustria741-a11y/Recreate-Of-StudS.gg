@@ -1,9 +1,5 @@
 import { getSession } from '../../lib/session'
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Search Roblox Creator Store for free models matching keywords
-// Returns an array of { id, name } for the AI to reference in scripts
-// ─────────────────────────────────────────────────────────────────────────────
 async function searchFreeModels(keywords) {
   const results = []
   for (const keyword of keywords.slice(0, 4)) {
@@ -26,20 +22,15 @@ async function searchFreeModels(keywords) {
   return results
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Build a proper .rbxl place file — scripts are nested inside their services
-// ─────────────────────────────────────────────────────────────────────────────
 function buildRbxl(scripts) {
   let refCounter = 0
   const ref = () => `RBX${String(refCounter++).padStart(8, '0')}`
-
   const escape = (str) =>
     String(str)
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
 
-  // Group scripts by location
   const byLocation = {}
   for (const s of scripts) {
     const loc = s.location || 'ServerScriptService'
@@ -76,7 +67,6 @@ function buildRbxl(scripts) {
     <Properties>
       <string name="Name">Place</string>
     </Properties>
-
     <Item class="Workspace" referent="${workspaceRef}">
       <Properties>
         <string name="Name">Workspace</string>
@@ -85,28 +75,24 @@ function buildRbxl(scripts) {
       </Properties>
       ${serviceScripts('Workspace')}
     </Item>
-
     <Item class="Lighting" referent="${lightingRef}">
       <Properties>
         <string name="Name">Lighting</string>
       </Properties>
       ${serviceScripts('Lighting')}
     </Item>
-
     <Item class="ReplicatedStorage" referent="${replStorageRef}">
       <Properties>
         <string name="Name">ReplicatedStorage</string>
       </Properties>
       ${serviceScripts('ReplicatedStorage')}
     </Item>
-
     <Item class="ServerScriptService" referent="${sssRef}">
       <Properties>
         <string name="Name">ServerScriptService</string>
       </Properties>
       ${serviceScripts('ServerScriptService')}
     </Item>
-
     <Item class="StarterGui" referent="${starterGuiRef}">
       <Properties>
         <string name="Name">StarterGui</string>
@@ -114,7 +100,6 @@ function buildRbxl(scripts) {
       </Properties>
       ${serviceScripts('StarterGui')}
     </Item>
-
     <Item class="StarterPlayer" referent="${starterPlayerRef}">
       <Properties>
         <string name="Name">StarterPlayer</string>
@@ -132,14 +117,10 @@ function buildRbxl(scripts) {
         ${serviceScripts('StarterCharacterScripts')}
       </Item>
     </Item>
-
   </Item>
 </roblox>`
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// System prompt — no script cap, map + UI + lighting + asset integration
-// ─────────────────────────────────────────────────────────────────────────────
 function buildSystemPrompt(freeAssets) {
   const assetContext = freeAssets.length > 0
     ? `\n\nFREE ROBLOX CREATOR STORE ASSETS YOU CAN USE (InsertService:LoadAsset(id)):\n` +
@@ -151,7 +132,8 @@ function buildSystemPrompt(freeAssets) {
 
   return `You are a senior Roblox game developer with 10 years of experience shipping AAA Roblox titles. You write production-quality Luau that other developers would be proud of.
 
-Return ONLY a raw JSON object — no markdown, no code fences, no preamble, no explanation. Raw JSON only.
+CRITICAL: Return ONLY a raw JSON object. No markdown, no code fences, no preamble. Raw JSON only.
+CRITICAL: All string values in JSON must be properly escaped. In "code" fields, escape all backslashes as \\\\, all quotes as \\", all newlines as \\n.
 
 JSON structure:
 {
@@ -166,83 +148,73 @@ JSON structure:
       "type": "Script|LocalScript|ModuleScript",
       "location": "ServerScriptService|StarterPlayerScripts|StarterGui|ReplicatedStorage|Workspace|Lighting|StarterCharacterScripts",
       "description": "string",
-      "code": "string"
+      "code": "string (properly JSON-escaped Luau code)"
     }
   ],
   "setupSteps": ["string"]
 }
 
-REQUIRED SCRIPTS — you must generate ALL of these categories, no exceptions:
+REQUIRED SCRIPTS:
+1. GameManager (ServerScriptService) - round logic, game states
+2. PlayerDataManager (ServerScriptService) - DataStore saving/loading
+3. EventsSetup (ServerScriptService) - create all RemoteEvents
+4. MapBuilder (ServerScriptService) - build terrain and structures
+5. LightingSetup (Lighting) - atmosphere and visual effects
+6. UIManager (StarterGui LocalScript) - full HUD and menus
+7. ClientController (StarterPlayerScripts LocalScript) - input handling
+8. Config (ReplicatedStorage ModuleScript) - game constants
 
-1. CORE SYSTEMS (as many as needed — no limit):
-   - GameManager (server): round logic, game states, win/lose conditions
-   - PlayerDataManager (server): DataStore saving/loading player stats with auto-save every 60s and on leave
-   - EventsSetup (server): create all RemoteEvents and RemoteFunctions in ReplicatedStorage
-   - Any additional server systems the game needs (economy, combat, trading, pets, etc.)
-
-2. MAP BUILDER (required — 1 Script in ServerScriptService):
-   - Name it "MapBuilder"
-   - Use workspace.Terrain:FillBlock() and workspace.Terrain:FillCylinder() to create terrain
-   - Use Instance.new("Part") to build structures, buildings, platforms, props
-   - Set colors using BrickColor and Material enums that match the game theme
-   - Use math.random for natural variation in placement
-   - Anchor all parts with part.Anchored = true
-   - Create named folders in Workspace to organize map elements
-   - If free assets are available above, load them with InsertService
-   - Build a map that matches the game description fully — do not use placeholder geometry
-
-3. LIGHTING & ATMOSPHERE (required — 1 Script in Lighting, name it "LightingSetup"):
-   - Must set game.Lighting properties: Ambient, OutdoorAmbient, Brightness, ClockTime, FogEnd, FogColor, SkyboxBk/Dn/Ft/Lf/Rt/Up
-   - Create Atmosphere instance: Density, Offset, Color, Decay, Glare, Haze
-   - Create ColorCorrection: Brightness, Contrast, Saturation, TintColor
-   - Create Bloom: Intensity, Size, Threshold
-   - Create SunRays if applicable: Intensity, Spread
-   - Match the mood: horror = dark red fog, low brightness; tycoon = warm sunny; sci-fi = blue/cyan cold light; fantasy = golden warm; etc.
-
-4. COMPLETE UI SYSTEM (required — 1 LocalScript in StarterGui, name it "UIManager"):
-   - Build the FULL UI entirely in Luau code — no external assets needed
-   - Create a main ScreenGui with ResetOnSpawn = false
-   - Build every UI element the game needs: HUD, menus, shops, inventory, leaderboard, notifications
-   - Style guidelines (MANDATORY — must follow):
-     * Use rounded corners: UICorner with CornerRadius = UDim.new(0, 8) on all frames
-     * Drop shadows: duplicate frame offset by 2px, black, 0.5 transparency, ZIndex -1
-     * Primary color from game theme (horror = dark red, tycoon = gold, etc.)
-     * Fonts: use Enum.Font.GothamBold for headers, Enum.Font.Gotham for body
-     * Smooth tweening: TweenService for all animations (open/close menus, notifications sliding in)
-     * No default Roblox GUI look — custom everything
-     * HUD must show: player stats relevant to the game, minimap placeholder, current objective
-     * Notifications system: sliding panels from top-right, auto-dismiss after 3 seconds
-
-5. CLIENT CONTROLLER (required — 1 LocalScript in StarterPlayerScripts, name it "ClientController"):
-   - Handle all client-side input (UserInputService, ContextActionService)
-   - Connect RemoteEvents from server
-   - Handle character spawn, camera setup
-   - Mobile-friendly: add touch buttons if the game needs them
-
-6. CHARACTER CONTROLLER if needed (StarterCharacterScripts):
-   - Custom movement, animations, abilities
-
-7. MODULE SCRIPTS in ReplicatedStorage:
-   - Config module: all game constants (speeds, prices, timers, etc.)
-   - Utility functions shared between client and server
-
-ADDITIONAL RULES:
-- Every script must be COMPLETE — no "-- TODO", no "-- add your code here", no placeholders
-- Write as many scripts as the game genuinely needs — a complex MMO should have 20+ scripts
-- All RemoteEvents must be created in EventsSetup BEFORE any other script tries to use them
-  (use script.Parent:WaitForChild() on the client side)
+RULES:
+- Every script must be COMPLETE with no placeholders
 - Use pcall() around all DataStore operations
-- Use CollectionService tags for tagging game objects
-- Characters should use Humanoid events properly
-- Anti-cheat: validate all RemoteEvent inputs on the server
-- Code style: PascalCase for instances, camelCase for variables, UPPER_CASE for constants
-- Add section comments like -- // SECTION NAME // -- to organize long scripts
+- Validate all RemoteEvent inputs on server
+- Use TweenService for UI animations
+- Mobile-friendly touch controls where needed
 ${assetContext}`
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Main handler
-// ─────────────────────────────────────────────────────────────────────────────
+function safeJsonParse(raw) {
+  // Remove markdown fences
+  let cleaned = raw
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/\s*```\s*$/, '')
+    .trim()
+
+  // Try direct parse first
+  try {
+    return JSON.parse(cleaned)
+  } catch (e1) {
+    // Try to extract JSON object
+    const start = cleaned.indexOf('{')
+    const end = cleaned.lastIndexOf('}')
+    if (start !== -1 && end !== -1) {
+      try {
+        return JSON.parse(cleaned.slice(start, end + 1))
+      } catch (e2) {
+        // Try fixing common issues: unescaped control characters in strings
+        try {
+          const fixed = cleaned.replace(
+            /"code"\s*:\s*"([\s\S]*?)(?<!\\)"/g,
+            (match, code) => {
+              const escaped = code
+                .replace(/\\/g, '\\\\')
+                .replace(/"/g, '\\"')
+                .replace(/\n/g, '\\n')
+                .replace(/\r/g, '\\r')
+                .replace(/\t/g, '\\t')
+              return `"code": "${escaped}"`
+            }
+          )
+          return JSON.parse(fixed)
+        } catch (e3) {
+          throw new Error(`JSON parse failed: ${e1.message}`)
+        }
+      }
+    }
+    throw new Error(`JSON parse failed: ${e1.message}`)
+  }
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end()
 
@@ -255,7 +227,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Step 1: Quick keyword extraction using a cheap OpenRouter model
+    // Step 1: Keyword extraction for free assets
     let freeAssets = []
     try {
       const kwRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -289,8 +261,7 @@ Reply ONLY with a JSON array of strings. Example: ["tree","building","sword","ch
       // Asset search failed — continue without assets
     }
 
-    // Step 2: Generate full game — try models in order until one works
-    // Free models (marked :free) have no cost, paid ones are fallbacks for quality
+    // Step 2: Generate full game with model fallback chain
     const MODELS = [
       'google/gemini-2.5-pro',
       'google/gemini-2.5-flash',
@@ -301,7 +272,6 @@ Reply ONLY with a JSON array of strings. Example: ["tree","building","sword","ch
     ]
 
     const systemPrompt = buildSystemPrompt(freeAssets)
-
     let raw = ''
     let modelUsed = ''
     let lastError = ''
@@ -319,12 +289,12 @@ Reply ONLY with a JSON array of strings. Example: ["tree","building","sword","ch
           },
           body: JSON.stringify({
             model,
-            max_tokens: 65536,
+            max_tokens: 32000,
             temperature: 0.4,
             response_format: { type: 'json_object' },
             messages: [
               { role: 'system', content: systemPrompt },
-              { role: 'user', content: `Create this complete Roblox game. Be thorough — generate every script needed for a polished, shippable game:\n\n${prompt}` },
+              { role: 'user', content: `Create this complete Roblox game. Generate every required script:\n\n${prompt}` },
             ],
           }),
         })
@@ -338,7 +308,6 @@ Reply ONLY with a JSON array of strings. Example: ["tree","building","sword","ch
 
         const orData = await orRes.json()
 
-        // OpenRouter sometimes wraps errors inside a 200
         if (orData.error) {
           lastError = `${model} error: ${orData.error.message || JSON.stringify(orData.error)}`
           console.warn(lastError)
@@ -367,22 +336,13 @@ Reply ONLY with a JSON array of strings. Example: ["tree","building","sword","ch
     if (!raw) {
       console.error('All models failed. Last error:', lastError)
       return res.status(502).json({
-        error: `All AI models failed. ${lastError}. Check your OPENROUTER_API_KEY in Vercel environment variables.`,
+        error: `All AI models failed. Check your OPENROUTER_API_KEY in Vercel environment variables.`,
       })
     }
 
-    const cleaned = raw
-      .replace(/^```(?:json)?\s*/i, '')
-      .replace(/\s*```\s*$/, '')
-      .trim()
-
-    const game = JSON.parse(cleaned)
+    const game = safeJsonParse(raw)
     game.modelUsed = modelUsed
-
-    // Attach free asset info for display in UI
     game.freeAssetsUsed = freeAssets
-
-    // Build the .rbxl place file
     game.rbxl = buildRbxl(game.scripts || [])
 
     return res.status(200).json({ game })
